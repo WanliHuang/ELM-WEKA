@@ -14,8 +14,8 @@
  */
 
 /*
- *    Logistic.java
- *    Copyright (C) 2003-2012 University of Waikato, Hamilton, New Zealand
+ *    ExtremeLearningMachine.java
+ *    Copyright (C) Wanli Huang 2018-2019 University of Waikato, Hamilton, New Zealand
  *
  */
 
