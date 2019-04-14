@@ -98,7 +98,8 @@ import weka.core.pmml.jaxbbindings.True;
  * </pre>
   <!-- options-end -->
  *
- * @author Wanli Huang (wanli.huang@gmail.com)
+ * @author Wanli Huang
+ * @email wanli.huang@gmail.com
  * @version $Revision$
  */
 public class ExtremeLearningMachine extends AbstractClassifier {
@@ -253,7 +254,15 @@ public class ExtremeLearningMachine extends AbstractClassifier {
         }
 
 
-        m_numOfInputNeutrons = instances.numAttributes()-1;
+
+        if(typeOfELM == 0){
+            m_numOfInputNeutrons = instances.numAttributes();
+        }else if (typeOfELM == 1){
+            m_numOfInputNeutrons = instances.numAttributes()-1;
+        }else {
+            System.out.println(" Wrong type of ELM. please check the parameter - type");
+            System.exit(0);
+        }
         m_numOfOutputNeutrons = instances.numClasses();
 
         if (instances.classAttribute().isNominal()) {
@@ -276,7 +285,7 @@ public class ExtremeLearningMachine extends AbstractClassifier {
 
         classesMatrix = extractLabels(instances); //Matrix only containing classes (labels)
         if (m_debug ==1 ) {
-            printMX("classMatrix", classesMatrix);
+            printMX("classesMatrix: ", classesMatrix);
         }
         if (m_seed != -1 ) {
             weightsOfInput = generateRandomMatrix(m_numHiddenNeurons,m_numOfInputNeutrons, m_seed);
@@ -315,11 +324,19 @@ public class ExtremeLearningMachine extends AbstractClassifier {
 
         int classIndex = instance.classIndex();
 
+        int numAttributes = 0;
 
-        int numAttributes = instance.numAttributes()-1;
+        if (typeOfELM == 0) {
+            numAttributes = instance.numAttributes(); // Regression
+        }else  if (typeOfELM == 1){
+            numAttributes = instance.numAttributes()-1;
+        }else {
+            System.out.println("Wrong type of ELM. please check the parameter - type");
+            System.exit(0);
+        }
         double[] testData = new double[numAttributes];
 
-        if (classIndex == numAttributes) { //if the class is in the last column
+        if (classIndex == numAttributes || typeOfELM == 0) { //if the class is in the last column
             // normalize numeric value
             for (int i = 0; i < numAttributes; i++) {
 
@@ -338,7 +355,7 @@ public class ExtremeLearningMachine extends AbstractClassifier {
                 }
 
             }
-        }else if (classIndex == 0){  // if the class attribute is in the first column
+        }else if (classIndex == 0  && typeOfELM == 1){  // if the class attribute is in the first column
             // normalize numeric value
             for (int i = 1; i < numAttributes+1; i++) {
 
@@ -363,8 +380,7 @@ public class ExtremeLearningMachine extends AbstractClassifier {
             prediction.set(i, 0, testData[i]);
         }
 
-        DenseMatrix H_test = new DenseMatrix(m_numHiddenNeurons, 1);
-        H_test = generateH(prediction,weightsOfInput,biases, 1);
+        DenseMatrix H_test =  generateH(prediction,weightsOfInput,biases, 1);
 
         DenseMatrix H_test_T = new DenseMatrix(1, m_numHiddenNeurons);
 
@@ -473,8 +489,16 @@ public class ExtremeLearningMachine extends AbstractClassifier {
 
 
         int numInstances = instances.numInstances();
-        int numAttributes = instances.numAttributes()-1;
+        int numAttributes = 0;
 
+        if (typeOfELM == 0) {
+            numAttributes = instances.numAttributes(); // Regression
+        }else  if (typeOfELM == 1){
+            numAttributes = instances.numAttributes()-1;
+        }else {
+            System.out.println("Wrong type of ELM. please check the parameter type");
+            System.exit(0);
+        }
 
         DenseMatrix AttributesMatrix = new DenseMatrix(numAttributes, numInstances);
 
@@ -484,7 +508,7 @@ public class ExtremeLearningMachine extends AbstractClassifier {
 
         arrayMinMax = new double[2][numAttributes];
 
-        if (classIndex == instances.numAttributes()-1) {
+        if (classIndex == instances.numAttributes()-1 || typeOfELM == 0) {
             // the class attribute is the last attribute
             for (int i = 0; i < numAttributes; i++) {
 
@@ -512,7 +536,7 @@ public class ExtremeLearningMachine extends AbstractClassifier {
 
 
             }
-        } else if (classIndex == 0) {
+        } else if (classIndex == 0 && typeOfELM == 1) {
            // the class attribute is the first attribute
             for (int i =1; i < numAttributes+1; i++) {
 
@@ -560,21 +584,32 @@ public class ExtremeLearningMachine extends AbstractClassifier {
 
         int numInstances = instances.numInstances();
         int numClasses = instances.numClasses();
-        if (typeOfELM == 0) numClasses = 1;
+        int numAttributes = instances.numAttributes();
+        double attMax = 0;
+        double attMin = 0;
+        if (typeOfELM == 0){
+            numClasses = 1;
+            attMax = instances.attributeStats(numAttributes-1).numericStats.max;  // the maximum value of the last attribute
+            attMin = instances.attributeStats(numAttributes-1).numericStats.min;  // the minimum value of the last attribute
+
+        }
 
 
         DenseMatrix LabelsMatrix = new DenseMatrix(numClasses, numInstances);
 
+
         for (int i = 0; i < numInstances; i++) {
-            for (int j = 0; j < numClasses; j++) {  //labels: 0, 1, 2 ......
 
+            if (typeOfELM == 1 ) {
 
-                if (typeOfELM == 1) {
+                for (int j = 0; j < numClasses; j++) {  //labels: 0, 1, 2 ......
 
-                    LabelsMatrix.set(j, i, instances.instance(i).classValue() ==  j ? 1 : -1); // fill all non-label with -1
-                } else if (typeOfELM == 0) {
-                    LabelsMatrix.set(j, i, instances.instance(i).value(0));  // allocate the first attribute value to the label matrix
+                    LabelsMatrix.set(j, i, instances.instance(i).classValue() == j ? 1 : -1); // fill all non-label with -1
+
                 }
+            }else if (typeOfELM == 0){
+                double normalizationValue = (instances.instance(i).value(numAttributes - 1) - attMin) / (attMax - attMin);  //normalize the firs attribute
+                LabelsMatrix.set(0, i, normalizationValue);  // allocate the first attribute value to the label matrix
             }
         }
 
@@ -726,6 +761,10 @@ public class ExtremeLearningMachine extends AbstractClassifier {
             }
             System.out.println("//");
         }
+
+        System.out.println("Press Enter to continue");
+        try{System.in.read();}
+        catch(Exception e){}
 
     }
 
