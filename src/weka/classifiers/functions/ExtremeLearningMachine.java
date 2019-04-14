@@ -98,8 +98,7 @@ import weka.core.pmml.jaxbbindings.True;
  * </pre>
   <!-- options-end -->
  *
- * @author Wanli Huang
- * @email wanli.huang@gmail.com
+ * @author Wanli Huang (wanli.huang@gmail.com)
  * @version $Revision$
  */
 public class ExtremeLearningMachine extends AbstractClassifier {
