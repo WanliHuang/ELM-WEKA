@@ -13,20 +13,24 @@ import no.uib.cipr.matrix.Matrices;
 import no.uib.cipr.matrix.NotConvergedException;
 import no.uib.cipr.matrix.SVD;
 
+import java.util.Random;
+
 public class Inverse {
     private DenseMatrix A1;
     //private DenseMatrix A2;
     private int m;
     private int n;
 
-    public Inverse(DenseMatrix AD){
+    private int seed;
+
+    public Inverse(DenseMatrix AD, int seed){
         m = AD.numRows();
         n = AD.numColumns();
         //if(m == n)
         A1 = AD.copy();
         //else
         //A2 = AD.copy();
-
+        this.seed = seed;
     }
 
     //Just the inverse maxtrix
@@ -56,9 +60,11 @@ public class Inverse {
             s[i] = Math.sqrt(s[i]);
         }
 
-        DenseMatrix S1 = (DenseMatrix) Matrices.random(m, sn);
+       // DenseMatrix S1 = (DenseMatrix) Matrices.random(m, sn);
+        DenseMatrix S1 = generateRandomMatrix(m, sn, seed);
         S1.zero();
-        DenseMatrix S2 = (DenseMatrix) Matrices.random(sn, n);
+        //DenseMatrix S2 = (DenseMatrix) Matrices.random(sn, n);
+        DenseMatrix S2 = generateRandomMatrix(sn, n, seed);
         S2.zero();
         for (int i = 0; i < s.length; i++) {
             S1.set(i, i, s[i]);
@@ -74,7 +80,7 @@ public class Inverse {
         DenseMatrix DT = new DenseMatrix(n,sn);
         D.transpose(DT);
         D.mult(DT, DD);
-        Inverse inv = new Inverse(DD);
+        Inverse inv = new Inverse(DD, seed);
         DenseMatrix invDD = inv.getInverse();
 
         DenseMatrix DDD = new DenseMatrix(n,sn);
@@ -85,7 +91,7 @@ public class Inverse {
         C.transpose(CT);
         //(C.transpose()).mult(C, CC);
         CT.mult(C, CC);
-        Inverse inv2 = new Inverse(CC);
+        Inverse inv2 = new Inverse(CC, seed);
         DenseMatrix invCC = inv2.getInverse();
 
         DenseMatrix CCC = new DenseMatrix(sn,m);
@@ -132,9 +138,11 @@ public class Inverse {
 
         //System.out.println("length of S: \n"+s.length+"  "+s[0]+" "+s[1]);
 
-        DenseMatrix S1 = (DenseMatrix) Matrices.random(m, sn);
+        // DenseMatrix S1 = (DenseMatrix) Matrices.random(m, sn);
+        DenseMatrix S1 = generateRandomMatrix(m, sn, seed);
         S1.zero();
-        DenseMatrix S2 = (DenseMatrix) Matrices.random(sn, n);
+        //DenseMatrix S2 = (DenseMatrix) Matrices.random(sn, n);
+        DenseMatrix S2 = generateRandomMatrix(sn, n, seed);
         S2.zero();
         for (int i = 0; i < s.length; i++) {
             S1.set(i, i, s[i]);
@@ -152,6 +160,28 @@ public class Inverse {
         //DenseMatrix CD = new DenseMatrix(m,n);
         //S1.mult(S2, CD);
         return CD;
+    }
+
+    /**
+     * Generate a matrix with random values
+     *
+     * @param rows
+     * @param cols
+     * @param m_seed
+
+     * @return return activation function's result
+
+     */
+    private static DenseMatrix generateRandomMatrix (int rows, int cols, int m_seed){
+
+        Random random_value = new Random(m_seed);
+        DenseMatrix randomMX = new DenseMatrix(rows, cols);
+        for (int i=0; i<rows; i++){
+            for (int j=0; j<cols;j++){
+                randomMX.set(i,j, random_value.nextDouble());
+            }
+        }
+        return randomMX;
     }
 
 

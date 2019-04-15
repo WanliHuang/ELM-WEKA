@@ -183,8 +183,7 @@ public class ExtremeLearningMachine extends AbstractClassifier {
 
     @OptionMetadata(
             displayName = "Random Seed",
-            description = "seed to be used for generating random number. -1 means using MTJ libraries's Matrices.random" +
-                          "rather than using own generateRandomMatrix method",
+            description = "seed to be used for generating random number.",
             displayOrder = 4,
             commandLineParamName = "seed",
             commandLineParamSynopsis = "-seed"
@@ -316,10 +315,11 @@ public class ExtremeLearningMachine extends AbstractClassifier {
         if (m_debug ==1 ) {
             printMX("classesMatrix: ", classesMatrix);
         }
-        if (m_seed != -1 ) {
-            weightsOfInput = generateRandomMatrix(m_numHiddenNeurons,m_numOfInputNeutrons, m_seed);
-        }else{
-            weightsOfInput = (DenseMatrix) Matrices.random(m_numHiddenNeurons, m_numOfInputNeutrons);
+
+
+        weightsOfInput = generateRandomMatrix(m_numHiddenNeurons,m_numOfInputNeutrons, m_seed);
+        if (m_debug ==1 ) {
+            printMX("Random Input Weights: ", weightsOfInput);
         }
 
 
@@ -759,7 +759,7 @@ public class ExtremeLearningMachine extends AbstractClassifier {
 
         DenseMatrix HT = new DenseMatrix(numInstances,m_numHiddenNeurons);
         H.transpose(HT);
-        Inverse inverseOfHT = new Inverse(HT);
+        Inverse inverseOfHT = new Inverse(HT, m_seed);
         DenseMatrix MoorePenroseInvHT = inverseOfHT.getMPInverse();
         if (m_debug == 1){
             printMX("MoorePenroseInvHT", MoorePenroseInvHT);
@@ -790,20 +790,21 @@ public class ExtremeLearningMachine extends AbstractClassifier {
     private double Activation(double value, int Activation_type){
 
         double result = 0.0;
-        if (Activation_type  == 1){
+        if (Activation_type  == 1){    //Sig
 
             result = 1.0f / (1 + Math.exp(-value));
 
-        }else if (Activation_type == 2){
+        }else if (Activation_type == 2){  //Sin
 
             result = Math.sin(value);
 
-        }else if (Activation_type == 3) {
+        }else if (Activation_type == 3) { //Hardlim
             // to do
-        }else if (Activation_type == 4) {
+        }else if (Activation_type == 4) { //Yibas
             // to do
-        }else if (Activation_type == 5) {
-            // to do
+        }else if (Activation_type == 5) { //Radbas
+            double a = 2, b = 2, c = Math.sqrt(2);
+            result =  a * Math.exp(-(value - b) * (value - b) / c * c);
         }
         return result;
     }
