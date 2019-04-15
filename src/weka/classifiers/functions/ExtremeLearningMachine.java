@@ -127,7 +127,7 @@ public class ExtremeLearningMachine extends AbstractClassifier {
 
     private int m_debug = 1;  // debugging mode switch
 
-
+    private int m_normalization = 1; //normalization mode
 
     // Option Metadata for Weka commands
 
@@ -207,6 +207,16 @@ public class ExtremeLearningMachine extends AbstractClassifier {
     public int getM_debug(){return this.m_debug;}
     public void setM_debug(int on) {this.m_debug = on;}
 
+    @OptionMetadata(
+            displayName = "Normalization",
+            description = "Normalize dataset",
+            displayOrder = 6,
+            commandLineParamName = "normalize",
+            commandLineParamSynopsis = "-normalize"
+    )
+
+    public int getM_normalization(){return this.m_normalization;}
+    public void setM_normalization(int normalization){this.m_normalization=normalization;}
 
 
 
@@ -217,7 +227,7 @@ public class ExtremeLearningMachine extends AbstractClassifier {
     private DenseMatrix instancesMatrix;
     private DenseMatrix classesMatrix;
 
-
+    private String[] labels;
 
     private int m_numOfInputNeutrons;  // it is actually the number of attributes
     private int m_numOfOutputNeutrons = 1;  // it is actually the number of classes
@@ -260,13 +270,19 @@ public class ExtremeLearningMachine extends AbstractClassifier {
         // Determine whether the classifier can handle the data
         getCapabilities().testWithFail(rawdata);
 
-        //normalize the dataset rawdata
-        Normalize filter = new Normalize();
-        filter.setInputFormat(rawdata);
-        // Make a copy of data and delete instances with a missing class value
-        Instances instances = Filter.useFilter(rawdata,filter);
-
+        Instances instances = new Instances(rawdata);
         instances.deleteWithMissingClass();
+
+        //if normalization mode is on
+        if (m_normalization == 1) {
+            //normalize the dataset rawdata
+            Normalize filter = new Normalize();
+            filter.setInputFormat(instances);
+            // Make a copy of data and delete instances with a missing class value
+            instances = Filter.useFilter(instances, filter);
+        }
+
+
         if (m_debug == 1){
             System.out.println("the class index is: " + instances.classIndex());
         }
@@ -417,16 +433,26 @@ public class ExtremeLearningMachine extends AbstractClassifier {
         if (m_typeOfELM == 0) {
             result = output.get(0,0);
             if (m_debug == 1){
-                System.out.println(result);
+                System.out.print(result + " ");
             }
         }else if (m_typeOfELM == 1){
             int indexMax = 0;
             double labelValue = output.get(0,0);
+
+            if (m_debug == 1){
+                System.out.println("Each instance output neuron result (after activation)");
+            }
             for (int i =0; i< m_numOfOutputNeutrons; i++){
+                if (m_debug == 1){
+                    System.out.print(output.get(0,i) + " ");
+                }
                 if (output.get(0,i) > labelValue){
                     labelValue = output.get(0,i);
                     indexMax = i;
                 }
+            }
+            if (m_debug == 1){
+                System.out.println("//");
             }
             result = indexMax;
         }
@@ -627,6 +653,22 @@ public class ExtremeLearningMachine extends AbstractClassifier {
 
         int numInstances = instances.numInstances();
         int numClasses = instances.numClasses();
+        int classIndex = instances.classIndex();
+
+        Attribute classAtt = instances.classAttribute();
+        labels = new String[numClasses];
+
+
+        if (m_typeOfELM == 1) {
+            for (int i = 0; i < numClasses; i++) {
+
+                labels[i] = classAtt.value(i);
+                if (m_debug == 1){
+                    System.out.print(labels[i]+", ");
+                }
+            }
+        }
+
 
         if (m_typeOfELM == 0) numClasses = 1;
 
@@ -640,13 +682,18 @@ public class ExtremeLearningMachine extends AbstractClassifier {
             if (m_typeOfELM == 1){
                 for (int j = 0; j < numClasses; j++) {  //labels: 0, 1, 2 ......
 
-                    LabelsMatrix.set(j, i, instances.instance(i).classValue() == j ? 1 : -1); // fill all non-label with -1
+                    String label = instances.instance(i).stringValue(classIndex);
+
+
+                    LabelsMatrix.set(j, i, label.equals(labels[j]) ? 1 : -1); // fill all non-label with -1
                 }
             }else if (m_typeOfELM == 0){
                 LabelsMatrix.set(0,i,instances.instance(i).classValue());
             }
 
         }
+
+
 
 
 
