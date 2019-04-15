@@ -28,6 +28,8 @@ import no.uib.cipr.matrix.*;
 import weka.classifiers.AbstractClassifier;
 import weka.core.*;
 import weka.core.Capabilities.Capability;
+import weka.filters.Filter;
+import weka.filters.unsupervised.attribute.Normalize;
 
 /**
  * <!-- globalinfo-start -->
@@ -257,8 +259,13 @@ public class ExtremeLearningMachine extends AbstractClassifier {
     public void buildClassifier(Instances rawdata) throws Exception {
         // Determine whether the classifier can handle the data
         getCapabilities().testWithFail(rawdata);
+
+        //normalize the dataset rawdata
+        Normalize filter = new Normalize();
+        filter.setInputFormat(rawdata);
         // Make a copy of data and delete instances with a missing class value
-        Instances instances = new Instances(rawdata);
+        Instances instances = Filter.useFilter(rawdata,filter);
+
         instances.deleteWithMissingClass();
         if (m_debug == 1){
             System.out.println("the class index is: " + instances.classIndex());
@@ -792,9 +799,6 @@ public class ExtremeLearningMachine extends AbstractClassifier {
         catch(Exception e){}
 
     }
-
-
-
 
 
 }
