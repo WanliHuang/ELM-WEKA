@@ -127,7 +127,7 @@ public class ExtremeLearningMachine extends AbstractClassifier {
 
     private int m_debug = 1;  // debugging mode switch
 
-    private int m_normalization = 1; //normalization mode
+
 
     // Option Metadata for Weka commands
 
@@ -206,16 +206,7 @@ public class ExtremeLearningMachine extends AbstractClassifier {
     public int getM_debug(){return this.m_debug;}
     public void setM_debug(int on) {this.m_debug = on;}
 
-    @OptionMetadata(
-            displayName = "Normalization",
-            description = "Normalize dataset",
-            displayOrder = 6,
-            commandLineParamName = "normalize",
-            commandLineParamSynopsis = "-normalize"
-    )
 
-    public int getM_normalization(){return this.m_normalization;}
-    public void setM_normalization(int normalization){this.m_normalization=normalization;}
 
 
 
@@ -226,7 +217,12 @@ public class ExtremeLearningMachine extends AbstractClassifier {
     private DenseMatrix instancesMatrix;
     private DenseMatrix classesMatrix;
 
+    private Instances instances;
+
     private String[] labels;
+    private int classIndex;
+
+    private double[][] m_normalization ; //to hold max and min value for each numeric attribute
 
     private int m_numOfInputNeutrons;  // it is actually the number of attributes
     private int m_numOfOutputNeutrons = 1;  // it is actually the number of classes
@@ -268,22 +264,52 @@ public class ExtremeLearningMachine extends AbstractClassifier {
     public void buildClassifier(Instances rawdata) throws Exception {
         // Determine whether the classifier can handle the data
         getCapabilities().testWithFail(rawdata);
-
         Instances instances = new Instances(rawdata);
         instances.deleteWithMissingClass();
 
-        //if normalization mode is on
-        if (m_normalization == 1) {
-            //normalize the dataset rawdata
-            Normalize filter = new Normalize();
-            filter.setInputFormat(instances);
-            // Make a copy of data and delete instances with a missing class value
-            instances = Filter.useFilter(instances, filter);
+        if (m_debug == 1) {
+            printInstances("instances before normalizing",instances);
+        }
+
+        m_normalization = new double[2][instances.numAttributes()];
+        // for each attribute | numeric attribute
+        for (int i = 0; i < instances.numAttributes(); i++) {
+            if (instances.attribute(i).isNumeric()) {
+                m_normalization[0][i] = instances.attributeStats(i).numericStats.max;
+                m_normalization[1][i] = instances.attributeStats(i).numericStats.min;
+            }
+        }
+
+        int rows = instances.numInstances();
+        int columns = instances.numAttributes();
+
+        //normalization x-min/(max-min)
+
+        for (int j = 0; j < columns; j++) {
+            if (instances.attribute(j).isNumeric()) {
+                double min = m_normalization[1][j];
+                double max = m_normalization[0][j];
+                double normValue = 0;
+                for (int i = 0; i < rows; i++) {
+                    if ( max  == min ){
+                        normValue = max;
+                    }else {
+                       normValue = (instances.instance(i).value(j) - min)/(max - min);
+                    }
+                    instances.instance(i).setValue(j,normValue);
+                }
+            }
         }
 
 
+
+        if (m_debug == 1) {
+            printInstances("instances after normalizing",instances);
+        }
+
+        classIndex = instances.classIndex();
         if (m_debug == 1){
-            System.out.println("the class index is: " + instances.classIndex());
+            System.out.println("the class index is: " + classIndex);
         }
 
 
@@ -351,70 +377,73 @@ public class ExtremeLearningMachine extends AbstractClassifier {
     @Override
     public double classifyInstance(Instance instance) throws Exception {
 
-        int classIndex = instance.classIndex();
-
 
 
         int numAttributes = instance.numAttributes();
+        int clsIndex = instance.classIndex();
+        boolean hasClassAttribute = true;
+        int numTestAtt = numAttributes -1;
+        if (numAttributes == m_numOfInputNeutrons) {
+            hasClassAttribute = false; // it means the test data doesn't has class attribute
+            numTestAtt = numTestAtt+1;
+        }
 
-        double[] testData = new double[numAttributes-1];
+        for (int i = 0; i< numAttributes; i++){
+            if (instance.attribute(i).isNumeric()){
+
+                double max = m_normalization[0][i];
+                double min = m_normalization[1][i];
+                double normValue = 0 ;
+                if (instance.value(i)<min) {
+                    normValue = 0;
+                    m_normalization[1][i] = instance.value(i); // reset the smallest value
+                }else if(instance.value(i)> max){
+                    normValue = 1;
+                    m_normalization[0][i] = instance.value(i); // reset the biggest value
+                }else {
+                    if (max == min ){
+                        if (max == 0){
+                            normValue = 0;
+                        }else {
+                            normValue = max/Math.abs(max);
+                        }
+                    }else {
+                        normValue = (instance.value(i) - min) / (max - min);
+                    }
+                }
+                instance.setValue(i, normValue);
+            }
+        }
+
+        double[] testData = new double[numTestAtt];
+
+
 
 
 
         int index = 0 ;
 
-        for (int i =0; i<numAttributes; i++) {
+        if (!hasClassAttribute){
 
-            if (i != classIndex) {
+            for (int i =0; i<numAttributes; i++) {
+                    testData[i] = instance.value(i);
+            }
+        }else {
+            for (int i = 0; i < numAttributes; i++) {
 
-                   testData[index] = instance.value(i);
+                if (i != clsIndex) {
 
-                index++;
+                    testData[index] = instance.value(i);
+
+                    index++;
+                }
             }
         }
 
-//        if (classIndex == numAttributes || m_typeOfELM == 0) { //if the class is in the last column
-//            // normalize numeric value
-//            for (int i = 0; i < numAttributes; i++) {
-//
-//                if (instance.attribute(i).isNumeric()) {
-//
-//                    if (instance.value(i) <= arrayMinMax[1][i]) {
-//                        testData[i] = 0;
-//                    } else if (instance.value(i) >= arrayMinMax[0][i]) {
-//                        testData[i] = 1;
-//                    } else {
-//                        testData[i] = (instance.value(i) - arrayMinMax[1][i]) / (arrayMinMax[0][i] - arrayMinMax[1][i]);
-//                    }
-//
-//                } else {
-//                    testData[i] = instance.value(i);
-//                }
-//
-//            }
-//        }else if (classIndex == 0  && m_typeOfELM == 1){  // if the class attribute is in the first column
-//            // normalize numeric value
-//            for (int i = 1; i < numAttributes+1; i++) {
-//
-//                if (instance.attribute(i).isNumeric()) {
-//
-//                    if (instance.value(i) <= arrayMinMax[1][i-1]) {
-//                        testData[i-1] = 0;
-//                    } else if (instance.value(i) >= arrayMinMax[0][i-1]) {
-//                        testData[i-1] = 1;
-//                    } else {
-//                        testData[i-1] = (instance.value(i) - arrayMinMax[1][i-1]) / (arrayMinMax[0][i-1] - arrayMinMax[1][i-1]);
-//                    }
-//
-//                } else {
-//                    testData[i-1] = instance.value(i);
-//                }
-//
-//            }
-//        }
 
-        DenseMatrix prediction = new DenseMatrix(numAttributes-1,1);
-        for (int i = 0; i<numAttributes-1; i++){
+
+        DenseMatrix prediction = new DenseMatrix(numTestAtt,1);
+        for (int i = 0; i<numTestAtt; i++){
             prediction.set(i, 0, testData[i]);
         }
 
@@ -431,7 +460,9 @@ public class ExtremeLearningMachine extends AbstractClassifier {
         double result = 0;
 
         if (m_typeOfELM == 0) {
-            result = output.get(0,0);
+            double value = output.get(0,0);
+            result = value*(m_normalization[0][classIndex]-m_normalization[1][classIndex])+m_normalization[1][classIndex];
+            //result = value;
             if (m_debug == 1){
                 System.out.print(result + " ");
             }
@@ -452,7 +483,9 @@ public class ExtremeLearningMachine extends AbstractClassifier {
                 }
             }
             if (m_debug == 1){
+
                 System.out.println("//");
+                System.out.println(indexMax);
             }
             result = indexMax;
         }
@@ -466,52 +499,6 @@ public class ExtremeLearningMachine extends AbstractClassifier {
 
 
 
-//     /**
-//     * Batch prediction method. This default implementation simply calls
-//     * distributionForInstance() for each instance in the batch. If subclasses can
-//     * produce batch predictions in a more efficient manner than this they should
-//     * override this method and also return true from
-//     * implementsMoreEfficientBatchPrediction()
-//     *
-//     * @param batch the instances to get predictions for
-//     * @return an array of probability distributions, one for each instance in the
-//     *         batch
-//     * @throws Exception if a problem occurs.
-//     */
-//
-//    public double[][] distributionForInstances(Instances batch) throws Exception {
-//
-//        int numOfClasses = batch.numClasses();
-//
-//
-//        int numOfInstances = batch.numInstances();
-//
-//        double[][] ds=new double[numOfClasses][numOfInstances];
-//
-//        instancesMatrix = extractAttributes(batch);
-//
-//        classesMatrix = extractLabels(batch);
-//
-//
-//        DenseMatrix testH = new DenseMatrix(m_numHiddenNeurons, numOfInstances);
-//        testH = generateH(instancesMatrix,weightsOfInput,biases, numOfInstances);
-//
-//        DenseMatrix transposedTestH = new DenseMatrix(numOfInstances, m_numHiddenNeurons);
-//        testH.transpose(transposedTestH);
-//
-//        DenseMatrix Predict = new DenseMatrix(numOfInstances, m_numOfOutputNeutrons);
-//        transposedTestH.mult(weightsOfOutput, Predict);
-//
-//        DenseMatrix transposedPredict = new DenseMatrix(m_numOfOutputNeutrons, numOfInstances);
-//        Predict.transpose(transposedPredict);
-//        for (int i = 0; i < numOfClasses; i++){
-//            for (int j = 0;j < numOfInstances; j++){
-//                ds[i][j] = transposedPredict.get(i,j);
-//            }
-//        }
-//
-//        return ds;
-//    }
 
     /**
      * Main method for testing this class.
@@ -536,7 +523,7 @@ public class ExtremeLearningMachine extends AbstractClassifier {
     private DenseMatrix extractAttributes(Instances instances){
 
 
-        int classIndex = instances.classIndex();
+
 
 
         int numInstances = instances.numInstances();
@@ -560,83 +547,7 @@ public class ExtremeLearningMachine extends AbstractClassifier {
 
         }
 
-//        if (m_typeOfELM == 0) {
-//            numAttributes = instances.numAttributes(); // Regression
-//        }else  if (m_typeOfELM == 1){
-//            numAttributes = instances.numAttributes()-1;
-//        }else {
-//            System.out.println("Wrong type of ELM. please check the parameter type");
-//            System.exit(0);
-//        }
-//
-//        DenseMatrix AttributesMatrix = new DenseMatrix(numAttributes, numInstances);
-//
-//
-//
-//        // use formula (value - min)/(max-min)  to normalize value.
-//
-//        arrayMinMax = new double[2][numAttributes];
-//
-//        if (classIndex == instances.numAttributes()-1 || m_typeOfELM == 0) {
-//            // the class attribute is the last attribute
-//            for (int i = 0; i < numAttributes; i++) {
-//
-//                if (instances.attribute(i).isNumeric()) {
-//                    arrayMinMax[0][i] = instances.attributeStats(i).numericStats.max;  // the maximum value of the attribute
-//                    arrayMinMax[1][i] = instances.attributeStats(i).numericStats.min;  // the minimum value of the attribute
-//                }
-//
-//            }
-//
-//            for (int i = 0; i < numAttributes; i++) {
-//
-//
-//                if (instances.attribute(i).isNumeric()) {
-//                    for (int j = 0; j < numInstances; j++) {
-//                        double tempValue = instances.instance(j).value(i) - arrayMinMax[1][i];
-//                        double normalizedValue = tempValue / (arrayMinMax[0][i] - arrayMinMax[1][i]);
-//                        AttributesMatrix.set(i, j, normalizedValue);
-//                    }
-//                } else {
-//                    for (int j = 0; j < numInstances; j++) {
-//                        AttributesMatrix.set(i, j, instances.instance(j).value(i));
-//                    }
-//                }
-//
-//
-//            }
-//        } else if (classIndex == 0 && m_typeOfELM == 1) {
-//           // the class attribute is the first attribute
-//            for (int i =1; i < numAttributes+1; i++) {
-//
-//                if (instances.attribute(i).isNumeric()) {
-//                    arrayMinMax[0][i-1] = instances.attributeStats(i).numericStats.max;  // the maximum value of the attribute
-//                    arrayMinMax[1][i-1] = instances.attributeStats(i).numericStats.min;  // the minimum value of the attribute
-//                }
-//
-//            }
-//
-//            for (int i = 1; i < numAttributes+1; i++) {
-//
-//
-//                if (instances.attribute(i).isNumeric()) {
-//                    for (int j = 0; j < numInstances; j++) {
-//                        double tempValue = instances.instance(j).value(i) - arrayMinMax[1][i-1];
-//                        double normalizedValue = tempValue / (arrayMinMax[0][i-1] - arrayMinMax[1][i-1]);
-//                        AttributesMatrix.set(i-1, j, normalizedValue);
-//                    }
-//                } else {
-//                    for (int j = 0; j < numInstances; j++) {
-//                        AttributesMatrix.set(i-1, j, instances.instance(j).value(i));
-//                    }
-//                }
-//
-//
-//            }
-//        }else {
-//            System.out.println("Please put class attribute either on the first column or the last column");
-//            System.exit(0);
-//        }
+
 
         return AttributesMatrix;
     }
@@ -653,7 +564,7 @@ public class ExtremeLearningMachine extends AbstractClassifier {
 
         int numInstances = instances.numInstances();
         int numClasses = instances.numClasses();
-        int classIndex = instances.classIndex();
+
 
         Attribute classAtt = instances.classAttribute();
         labels = new String[numClasses];
@@ -688,7 +599,7 @@ public class ExtremeLearningMachine extends AbstractClassifier {
                     LabelsMatrix.set(j, i, label.equals(labels[j]) ? 1 : -1); // fill all non-label with -1
                 }
             }else if (m_typeOfELM == 0){
-                LabelsMatrix.set(0,i,instances.instance(i).classValue());
+                LabelsMatrix.set(0,i,instances.instance(i).value(classIndex));
             }
 
         }
@@ -838,6 +749,23 @@ public class ExtremeLearningMachine extends AbstractClassifier {
         for (int i=0; i<MX.numRows(); i++){
             for (int j=0; j<MX.numColumns();j++){
                 System.out.print(MX.get(i,j)+", ");
+            }
+            System.out.println("//");
+        }
+
+        System.out.println("Press Enter to continue");
+        try{System.in.read();}
+        catch(Exception e){}
+
+    }
+
+    private void printInstances (String nameMX, Instances MX){
+
+        System.out.println(nameMX + "numInstances "+ MX.numInstances());
+        System.out.println(nameMX + "numAttributes: "+ MX.numAttributes());
+        for (int i=0; i<MX.numInstances(); i++){
+            for (int j=0; j<MX.numAttributes();j++){
+                System.out.print(MX.instance(i).value(j)+", ");
             }
             System.out.println("//");
         }
