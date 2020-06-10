@@ -15,7 +15,7 @@
 
 /*
  *    ExtremeLearningMachine.java
- *    Copyright (C) Wanli Huang 2018-2019 University of Waikato, Hamilton, New Zealand
+ *    Copyright (C) Wanli Huang 2018-2019
  *
  */
 
